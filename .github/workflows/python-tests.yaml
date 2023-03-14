@@ -57,6 +57,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip pytest
         python -m pip install .
+        git clone https://github.com/cgevans/convert-nanoscope-test-files tests/files
     - name: Test with pytest
       run: |
         pytest

@@ -1,3 +1,0 @@
-[submodule "tests/files"]
-	path = tests/files
-	url = https://github.com/cgevans/convert-nanoscope-test-files
