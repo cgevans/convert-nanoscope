@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 from functools import cached_property
 import numpy as np

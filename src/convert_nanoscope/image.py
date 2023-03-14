@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Needs:
 # - pip install pillow tqdm numpy click matplotlib
 
