@@ -1,83 +1,40 @@
 # Needs:
 # - pip install pillow tqdm numpy click matplotlib
 
-fontname = "FiraSans-Regular.ttf"
 
-from os import PathLike
-import pathlib
-from typing import Any, Sequence
+from typing import Sequence
 import numpy as np
-import re
 from PIL import Image, ImageDraw, ImageFont
 from tqdm.contrib.concurrent import process_map
-from functools import cached_property
 import click
-import matplotlib
+import pathlib
+from .spm import NanoscopeFile
 
-class NanoscopeFile:
-    def __init__(self, path: PathLike):
-        self._path = pathlib.Path(path)
-        self._handle = self._path.open('rb')
-        dlist = {'Ciao image': []}
-        vl = {}
-        for line in self._handle:
-            if line.startswith(b"\\*File list end"):
-                break
-            elif m := re.match(r"\\\*(.*) list\r\n", line.decode('windows-1252')):
-                vl = {}
-                if m.group(1) != "Ciao image":
-                    dlist[m.group(1)] = vl
-                else:
-                    dlist[m.group(1)].append(vl)
-            elif line.startswith(b"\\"):
-                l = line[1:].decode('windows-1252')
-                k, v = l.split(": ", 1)
-                vl[k] = v.strip()
-        self.images = [NanoscopeImage(self, x) for x in dlist['Ciao image']]
+# A reasonable list of fonts that are likely to found *somewhere*:
 
-    def first_height_image(self):
-        return next(x for x in self.images if x.data_type == 'Height')
-        
-class NanoscopeImage:
-    def __init__(self, file: NanoscopeFile, metadata: dict[str, Any]):
-        self._file = file
-        self._metadata = metadata
+FONTS_TO_TRY = [
+    "Helvetica",
+    "Arial",
+    "arial",
+    "FiraSans-Regular",
+    "LiberationSans-Regular",
+    "DejaVuSans"
+]
 
-    @cached_property
-    def shape(self):
-        x = int(self._metadata['Number of lines'])
-        y = int(self._metadata['Samps/line'])
-        return x, y
-    
-    @cached_property
-    def data_type(self):
-        d = re.search(r"\[([^]]+)\]", self._metadata['@2:Image Data'])
-        if d:
-            return d.group(1)
-        else:
-            return None
-        
-    @cached_property
-    def raw_data(self):
-        self._file._handle.seek(int(self._metadata['Data offset']))
-        return np.fromfile(self._file._handle, count=int(self._metadata['Data length'])//4, dtype=np.int32).reshape(self.shape)[::-1,:]
+USABLE_FONTNAME = None
+for font in FONTS_TO_TRY:
+    try:
+        ImageFont.truetype(font)
+        USABLE_FONTNAME = font
+    except OSError:
+        continue
 
-    def processed_data(self, planefit: bool = True, linemedian: bool = True):
-        dat = self.raw_data
-        if planefit:
-            xv = dat.mean(axis=1)
-            xpa = np.polyfit(np.arange(len(xv)), xv - xv[0], 1)[0]
-            yv = dat.mean(axis=0)
-            ypa = np.polyfit(np.arange(len(yv)), yv - yv[0], 1)[0]
-            dat = dat - xpa * np.arange(len(xv))[:,None] - ypa * np.arange(len(yv))[None,:]
-        if linemedian:
-            dm = np.median(dat, axis=1)
-            dm -= dm.mean()
-            dat = dat - dm[:,None]
-        return dat
 
-def proc_spm(fname: str, add_title: bool = True, add_bar: bool = True, fnt = None, cmap: str | None = None) -> Image:
-    f = NanoscopeFile(fname)
+def proc_spm(fname: str | NanoscopeFile, add_title: bool = True, add_bar: bool = True, font = None | str, cmap: str | None = None) -> Image:
+    if isinstance(fname, NanoscopeFile):
+        f = fname
+    else:
+        f = NanoscopeFile(fname)
 
     height = f.first_height_image()
 
@@ -93,7 +50,12 @@ def proc_spm(fname: str, add_title: bool = True, add_bar: bool = True, fnt = Non
 
     ylen, xlen = dat.shape
 
-    fnt = ImageFont.truetype(fontname, int(26 * xlen / 1024))
+    if isinstance(font, str):
+        fnt = ImageFont.truetype(font, int(26 * xlen / 1024))
+    else:
+        if USABLE_FONTNAME is None:
+            raise OSError("Can't find a usable font.")
+        fnt = ImageFont.truetype(USABLE_FONTNAME, int(26 * xlen / 1024))
 
     # fig, ax = plt.subplots(constrained_layout=True, figsize=(6,6))
     # ax.axis("off")
@@ -107,10 +69,9 @@ def proc_spm(fname: str, add_title: bool = True, add_bar: bool = True, fnt = Non
     if cmap is not None:
         import matplotlib.cm as cm
         img = Image.fromarray((cm.get_cmap(cmap, lut=256)(iv)[:, :, :3]*255).astype(np.uint8), mode="RGB")
-        an_color = "white"
     else:
         img = Image.fromarray(iv,  mode="L")
-        an_color = 255
+    an_color = "white"
 
 
     if add_bar:
@@ -154,7 +115,7 @@ def proc_and_save(v):
 @click.option('--cmap', '-c', type=str, help='Matplotlib colormap to use')
 @click.argument('PATH', type=click.Path(exists=True), nargs=-1)
 def main(title, bar, recursive, path: Sequence[str], cmap: str | None = None):
-    toconvert = []
+    toconvert: list[pathlib.Path | str] = []
 
     if len(path) == 0:
         click.echo("No paths or filenames provided: converting SPM files in current directory.")
