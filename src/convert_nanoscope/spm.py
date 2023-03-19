@@ -29,7 +29,11 @@ class NanoscopeFile:
         self.images = [NanoscopeImage(self, x) for x in dlist["Ciao image"]]
 
     def first_height_image(self):
-        return next(x for x in self.images if (x.data_type == "Height") or (x.data_type == "ZSensor"))
+        return next(
+            x
+            for x in self.images
+            if (x.data_type == "Height") or (x.data_type == "ZSensor")
+        )
 
 
 class NanoscopeImage:
