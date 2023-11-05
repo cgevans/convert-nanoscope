@@ -11,7 +11,8 @@ from tqdm.contrib.concurrent import process_map
 import click
 import pathlib
 from .spm import NanoscopeFile
-
+from matplotlib.colors import LinearSegmentedColormap
+import matplotlib
 # A reasonable list of fonts that are likely to found *somewhere*:
 
 FONTS_TO_TRY = [
@@ -22,6 +23,20 @@ FONTS_TO_TRY = [
     "LiberationSans-Regular",
     "DejaVuSans",
 ]
+
+cdict = {'red':   [[0.0,  0.0, 0.0],
+                   [1.0,  0.992, 0.992]],
+         'green': [[0.0,  0.0, 0.0],
+                   [0.342, 0.0, 0.0],
+                   [1.0,  1.0, 1.0]],
+         'blue':  [[0.0,  0.0, 0.0],
+                   [0.635,  0.0, 0.0],
+                   [1.0,  0.992, 0.992]]}
+
+nanoscope_cm = LinearSegmentedColormap('nanoscope', segmentdata=cdict, N=256) # type: ignore
+if not hasattr(matplotlib.colormaps, "nanoscope"):
+    matplotlib.colormaps.register(nanoscope_cm)
+
 
 USABLE_FONTNAME = None
 for font in FONTS_TO_TRY:
@@ -131,8 +146,11 @@ toconvert = glob.glob("*.spm")
 
 def proc_and_save(v):
     fname, bar, title, cmap = v
-    img = proc_spm(fname, add_title=title, add_bar=bar, cmap=cmap)
-    img.save(fname.replace(".spm", ".png"))
+    try:
+        img = proc_spm(fname, add_title=title, add_bar=bar, cmap=cmap)
+        img.save(fname.replace(".spm", ".png"))
+    except Exception as e:
+        print(f"Error processing {fname}: {e}")
 
 
 @click.command()
@@ -141,7 +159,7 @@ def proc_and_save(v):
 )
 @click.option("--bar/--no-bar", default=True, help="Add a scale bar to the image")
 @click.option("-r", "--recursive", is_flag=True, help="Search for files recursively")
-@click.option("--cmap", "-c", type=str, help="Matplotlib colormap to use")
+@click.option("--cmap", "-c", type=str, help="Matplotlib colormap to use, instead of grayscale (try nanoscope, or afmhot)")
 @click.argument("PATH", type=click.Path(exists=True), nargs=-1)
 def main(title, bar, recursive, path: Sequence[str], cmap: str | None = None):
     toconvert: list[pathlib.Path | str] = []

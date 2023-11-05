@@ -4,9 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "convert-nanoscope"
-version = "0.0.1"
+version = "0.1.0"
 
-authors = [{name = "Constantine Evans", email = "const@costi.eu"}]
+authors = [{name = "Constantine Evans", email = "const@costi.net"}]
+
+license = {text = "EUPL-1.2"}
 
 requires-python = ">=3.9"
 
