@@ -92,10 +92,8 @@ def proc_spm(
     )
     # create pillow image from array
     if cmap is not None:
-        import matplotlib.cm as cm
-
         img = Image.fromarray(
-            (cm.get_cmap(cmap, lut=256)(iv)[:, :, :3] * 255).astype(np.uint8),
+            (matplotlib.colormaps[cmap](iv)[:, :, :3] * 255).astype(np.uint8),
             mode="RGB",
         )
     else:
