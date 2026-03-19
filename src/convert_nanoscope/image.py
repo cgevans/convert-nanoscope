@@ -143,10 +143,13 @@ toconvert = glob.glob("*.spm")
 
 
 def proc_and_save(v):
-    fname, bar, title, cmap = v
+    fname, bar, title, cmap, output = v
     try:
         img = proc_spm(fname, add_title=title, add_bar=bar, cmap=cmap)
-        img.save(fname.replace(".spm", ".png"))
+        if output is not None:
+            img.save(output)
+        else:
+            img.save(fname.replace(".spm", ".png"))
     except Exception as e:
         print(f"Error processing {fname}: {e}")
 
@@ -158,8 +161,9 @@ def proc_and_save(v):
 @click.option("--bar/--no-bar", default=True, help="Add a scale bar to the image")
 @click.option("-r", "--recursive", is_flag=True, help="Search for files recursively")
 @click.option("--cmap", "-c", type=str, help="Matplotlib colormap to use, instead of grayscale (try nanoscope, or afmhot)")
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file path (only valid with a single input file)")
 @click.argument("PATH", type=click.Path(exists=True), nargs=-1)
-def main(title, bar, recursive, path: Sequence[str], cmap: str | None = None):
+def main(title, bar, recursive, path: Sequence[str], cmap: str | None = None, output: str | None = None):
     toconvert: list[pathlib.Path | str] = []
 
     if len(path) == 0:
@@ -178,7 +182,10 @@ def main(title, bar, recursive, path: Sequence[str], cmap: str | None = None):
         else:
             toconvert.append(pp)
 
-    process_map(proc_and_save, [(str(x), bar, title, cmap) for x in toconvert])
+    if output is not None and len(toconvert) != 1:
+        raise click.UsageError("--output can only be used with a single input file")
+
+    process_map(proc_and_save, [(str(x), bar, title, cmap, output) for x in toconvert])
 
 
 if __name__ == "__main__":
